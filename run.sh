@@ -3,8 +3,10 @@
 cd "$(dirname "$0")"
 
 if pgrep -f "watch\.py" > /dev/null; then
-    notify-send "OCR Watcher" "Ya hay una instancia corriendo, no se abrio otra."
-    exit 0
+    pkill -f "watch\.py"
+    pkill -f "select_region\.py"
+    sleep 1
+    notify-send "OCR Watcher" "Reiniciando..."
 fi
 
 exec .venv/bin/python -u watch.py "$@" > watcher.log 2>&1
