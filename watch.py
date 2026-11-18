@@ -16,17 +16,29 @@ import subprocess
 import sys
 import time
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageChops, ImageOps
 import pytesseract
 
 from screencast import ScreenCastSession, FrameGrabber
 
 REGION_FILE = "region.json"
-DEFAULT_PATTERN = r"C[OÓ0]DIGO[^A-Z0-9]{0,5}([A-Z0-9]{3,6}-[A-Z0-9]{3,6}-[A-Z0-9]{3,6})"
+DEFAULT_PATTERN = r"\b([A-Z0-9]{3,6}-[A-Z0-9]{3,6}-[A-Z0-9]{3,6})\b"
 TESSERACT_CONFIG = (
     "--psm 6 -c tessedit_char_whitelist="
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:- "
 )
+TESSERACT_CONFIG_LINE = (
+    "--psm 7 -c tessedit_char_whitelist="
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-"
+)
+
+# Color del texto del codigo en el video de prueba (rosado/magenta tipo
+# #F7A4C5): H~335 grados, S~30%, V~90%. En la escala 0-255 que usa PIL
+# para HSV eso es H~237. Se usa para aislar el texto del codigo del resto
+# del fondo/otros textos, que no tienen ese color.
+CODE_HUE_RANGE = (225, 252)
+CODE_SAT_MIN = 35
+CODE_VAL_MIN = 120
 
 
 def preprocess(crop):
@@ -37,6 +49,22 @@ def preprocess(crop):
     gray = ImageOps.grayscale(crop)
     gray = ImageOps.autocontrast(gray, cutoff=1)
     return gray
+
+
+def isolate_code_color(crop):
+    """Aisla solo los pixeles con el color rosado/magenta del codigo, y deja
+    todo lo demas (fondo, otros textos) en blanco. Le quita al OCR todo el
+    ruido alrededor cuando el codigo tiene ese color especifico."""
+    hsv = crop.convert("HSV")
+    h, s, v = hsv.split()
+    lo, hi = CODE_HUE_RANGE
+    h_mask = h.point(lambda x: 255 if lo <= x <= hi else 0)
+    s_mask = s.point(lambda x: 255 if x >= CODE_SAT_MIN else 0)
+    v_mask = v.point(lambda x: 255 if x >= CODE_VAL_MIN else 0)
+    mask = ImageChops.multiply(ImageChops.multiply(h_mask, s_mask), v_mask)
+    # texto negro sobre fondo blanco, que es lo que mejor lee Tesseract
+    text_on_white = mask.point(lambda x: 0 if x == 255 else 255)
+    return text_on_white.resize((crop.width * 3, crop.height * 3), Image.LANCZOS)
 
 
 MAX_THUMB_WIDTH = 2800
@@ -99,30 +127,72 @@ def main():
     print(f"Zona: {region}")
     print("Vigilando...")
 
+    def grab_crop():
+        frame = grabber.grab()
+        return frame.crop((
+            region["x"], region["y"],
+            region["x"] + region["width"], region["y"] + region["height"],
+        ))
+
+    FALLBACK_EVERY = 5  # cada cuantos ciclos se corre tambien el OCR generico
+    cycle = 0
+
+    def read_and_match():
+        """Primero revisa (sin Tesseract, muy rapido) si hay pixeles del color
+        rosado del codigo en la zona. Si no hay, no vale la pena correr OCR y
+        se salta el ciclo casi gratis. Si hay, lee solo esa mascara (limpia,
+        sin ruido de fondo). Cada FALLBACK_EVERY ciclos ademas corre el OCR
+        generico por si el codigo aparece con otro color en algun momento."""
+        nonlocal cycle
+        cycle += 1
+        crop = grab_crop()
+        mask = isolate_code_color(crop)
+        min_val, _ = mask.getextrema()
+        if min_val < 255:
+            text = pytesseract.image_to_string(mask, lang=args.lang, config=TESSERACT_CONFIG_LINE)
+            match = pattern.search(text.upper())
+            if match:
+                return match, text
+        else:
+            text = ""
+
+        if cycle % FALLBACK_EVERY == 0:
+            text_full = pytesseract.image_to_string(preprocess(crop), lang=args.lang, config=TESSERACT_CONFIG)
+            match_full = pattern.search(text_full.upper())
+            if match_full:
+                return match_full, text_full
+            text = text_full or text
+
+        return None, text
+
     deadline = time.monotonic() + args.seconds
     last_seen_raw = None
 
     try:
         while time.monotonic() < deadline:
             try:
-                frame = grabber.grab()
+                match, text = read_and_match()
             except RuntimeError as e:
                 print(f"[{time.strftime('%H:%M:%S')}] aviso: {e}, reintentando...")
                 time.sleep(args.interval)
                 continue
-            crop = frame.crop((
-                region["x"], region["y"],
-                region["x"] + region["width"], region["y"] + region["height"],
-            ))
-            crop = preprocess(crop)
-
-            text = pytesseract.image_to_string(crop, lang=args.lang, config=TESSERACT_CONFIG)
             if text.strip() and text != last_seen_raw:
                 last_seen_raw = text
                 print(f"[{time.strftime('%H:%M:%S')}] leido: {text.strip()!r}")
 
-            match = pattern.search(text.upper())
             if match:
+                # El codigo puede aparecer con un desvanecido (fade-in): si lo
+                # agarramos recien apareciendo sale muy tenue y el OCR falla mas.
+                # Esperamos un poco y volvemos a leer para confirmar con una
+                # imagen mas nitida antes de copiar.
+                time.sleep(1.0)
+                try:
+                    match2, _ = read_and_match()
+                    if match2:
+                        match = match2
+                except RuntimeError:
+                    pass
+
                 codigo = match.group(1).replace("-", "")
                 copy_to_clipboard(codigo)
                 print(f"\n>>> CODIGO DETECTADO: {codigo}  (copiado al portapapeles)")
