@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.restore_token
+region.json
+bg_select.png
+*.log
