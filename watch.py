@@ -22,7 +22,7 @@ import pytesseract
 from screencast import ScreenCastSession, FrameGrabber
 
 REGION_FILE = "region.json"
-DEFAULT_PATTERN = r"\b([A-Z0-9]{3,6}-[A-Z0-9]{3,6}-[A-Z0-9]{3,6})\b"
+DEFAULT_PATTERN = r"\b([A-Z0-9]{3,5}-[A-Z0-9]{3,5}-[A-Z0-9]{3,5})\b"
 TESSERACT_CONFIG = (
     "--psm 6 -c tessedit_char_whitelist="
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:- "
@@ -127,6 +127,11 @@ def main():
     print(f"Zona: {region}")
     print("Vigilando...")
 
+    overlay_proc = subprocess.Popen([
+        sys.executable, "overlay.py",
+        str(region["x"]), str(region["y"]), str(region["width"]), str(region["height"]),
+    ])
+
     def grab_crop():
         frame = grabber.grab()
         return frame.crop((
@@ -205,6 +210,7 @@ def main():
         notify("OCR Watcher", "Tiempo agotado, no se detecto ningun codigo.")
     finally:
         grabber.close()
+        overlay_proc.terminate()
 
 
 if __name__ == "__main__":
