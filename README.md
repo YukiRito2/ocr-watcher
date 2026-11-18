@@ -36,7 +36,7 @@ usa del sistema).
 ## Uso
 
 ```bash
-./run.sh                      # te pide marcar la zona y vigila 120s
+./run.sh                      # te pide marcar la zona y vigila 12 min
 ./run.sh --use-last           # reusa la ultima zona marcada, sin preguntar
 ./run.sh --seconds 60         # cambia el tiempo maximo de espera
 ./run.sh --interval 0.4       # cambia la frecuencia de lectura

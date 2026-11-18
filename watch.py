@@ -3,7 +3,7 @@ codigo (texto con formato tipo XXX-XXXX-123) y copiarlo al portapapeles apenas
 aparece.
 
 Uso:
-    .venv/bin/python watch.py                  # selecciona zona y vigila 120s
+    .venv/bin/python watch.py                  # selecciona zona y vigila 12 min
     .venv/bin/python watch.py --use-last        # reusa la ultima zona guardada
     .venv/bin/python watch.py --seconds 60
     .venv/bin/python watch.py --pattern '[A-Z0-9]{4,6}'
@@ -105,7 +105,7 @@ def notify(title, body):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--seconds", type=int, default=120, help="tiempo maximo de vigilancia")
+    parser.add_argument("--seconds", type=int, default=720, help="tiempo maximo de vigilancia")
     parser.add_argument("--interval", type=float, default=0.7, help="segundos entre capturas")
     parser.add_argument("--pattern", default=DEFAULT_PATTERN, help="regex del codigo a detectar")
     parser.add_argument("--lang", default="spa+eng", help="idiomas para tesseract")
