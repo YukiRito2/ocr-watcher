@@ -185,7 +185,7 @@ def main():
                 # agarramos recien apareciendo sale muy tenue y el OCR falla mas.
                 # Esperamos un poco y volvemos a leer para confirmar con una
                 # imagen mas nitida antes de copiar.
-                time.sleep(1.0)
+                time.sleep(0.5)
                 try:
                     match2, _ = read_and_match()
                     if match2:
