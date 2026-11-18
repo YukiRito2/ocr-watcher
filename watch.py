@@ -2,9 +2,11 @@
 codigo (texto con formato tipo XXX-XXXX-123) y copiarlo al portapapeles apenas
 aparece.
 
+Si ya existe una zona guardada de una vez anterior, pregunta (con un dialogo,
+sin consola) si usar la misma o marcar una nueva.
+
 Uso:
-    .venv/bin/python watch.py                  # selecciona zona y vigila 12 min
-    .venv/bin/python watch.py --use-last        # reusa la ultima zona guardada
+    .venv/bin/python watch.py                  # pregunta la zona y vigila 12 min
     .venv/bin/python watch.py --seconds 60
     .venv/bin/python watch.py --pattern '[A-Z0-9]{4,6}'
 """
@@ -70,8 +72,26 @@ def isolate_code_color(crop):
 MAX_THUMB_WIDTH = 2800
 
 
-def ensure_region(use_last, grabber):
-    if use_last and os.path.exists(REGION_FILE):
+def ask_use_last_region():
+    import tkinter as tk
+    from tkinter import messagebox
+
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    with open(REGION_FILE) as f:
+        region = json.load(f)
+    answer = messagebox.askyesno(
+        "Zona a vigilar",
+        f"¿Usar la misma zona que la vez anterior?\n\n{region}",
+        parent=root,
+    )
+    root.destroy()
+    return answer
+
+
+def ensure_region(grabber):
+    if os.path.exists(REGION_FILE) and ask_use_last_region():
         pass
     else:
         print("Tomando una foto de tu pantalla para usar de miniatura en el selector...")
@@ -109,10 +129,6 @@ def main():
     parser.add_argument("--interval", type=float, default=0.7, help="segundos entre capturas")
     parser.add_argument("--pattern", default=DEFAULT_PATTERN, help="regex del codigo a detectar")
     parser.add_argument("--lang", default="spa+eng", help="idiomas para tesseract")
-    parser.add_argument(
-        "--use-last", action="store_true",
-        help="reusar la ultima zona guardada en vez de volver a preguntar",
-    )
     args = parser.parse_args()
 
     pattern = re.compile(args.pattern)
@@ -123,14 +139,9 @@ def main():
     print("Permiso concedido.")
     grabber = FrameGrabber(node_id, pw_fd)
 
-    region = ensure_region(args.use_last, grabber)
+    region = ensure_region(grabber)
     print(f"Zona: {region}")
     print("Vigilando...")
-
-    overlay_proc = subprocess.Popen([
-        sys.executable, "overlay.py",
-        str(region["x"]), str(region["y"]), str(region["width"]), str(region["height"]),
-    ])
 
     def grab_crop():
         frame = grabber.grab()
@@ -210,7 +221,6 @@ def main():
         notify("OCR Watcher", "Tiempo agotado, no se detecto ningun codigo.")
     finally:
         grabber.close()
-        overlay_proc.terminate()
 
 
 if __name__ == "__main__":
