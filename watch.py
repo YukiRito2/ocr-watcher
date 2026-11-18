@@ -16,7 +16,7 @@ import subprocess
 import sys
 import time
 
-from PIL import Image, ImageFilter, ImageOps
+from PIL import Image, ImageOps
 import pytesseract
 
 from screencast import ScreenCastSession, FrameGrabber
@@ -24,7 +24,7 @@ from screencast import ScreenCastSession, FrameGrabber
 REGION_FILE = "region.json"
 DEFAULT_PATTERN = r"C[OÓ0]DIGO[^A-Z0-9]{0,5}([A-Z0-9]{3,6}-[A-Z0-9]{3,6}-[A-Z0-9]{3,6})"
 TESSERACT_CONFIG = (
-    "--oem 1 --psm 6 -c tessedit_char_whitelist="
+    "--psm 6 -c tessedit_char_whitelist="
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:- "
 )
 
@@ -32,11 +32,9 @@ TESSERACT_CONFIG = (
 def preprocess(crop):
     """Sube nitidez y contraste SIN binarizar a blanco/negro duro: un umbral
     duro borraba los guiones (trazos finos). Tesseract (motor LSTM) funciona
-    mejor con gris suave que con blanco/negro forzado. 4x (en vez de 3x) +
-    un enfoque (unsharp mask) ayuda a que no se confunda la X con el 0."""
-    crop = crop.resize((crop.width * 4, crop.height * 4), Image.LANCZOS)
+    mejor con gris suave que con blanco/negro forzado."""
+    crop = crop.resize((crop.width * 3, crop.height * 3), Image.LANCZOS)
     gray = ImageOps.grayscale(crop)
-    gray = gray.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=2))
     gray = ImageOps.autocontrast(gray, cutoff=1)
     return gray
 
