@@ -36,9 +36,9 @@ TESSERACT_CONFIG_LINE = (
 # #F7A4C5): H~335 grados, S~30%, V~90%. En la escala 0-255 que usa PIL
 # para HSV eso es H~237. Se usa para aislar el texto del codigo del resto
 # del fondo/otros textos, que no tienen ese color.
-CODE_HUE_RANGE = (225, 252)
-CODE_SAT_MIN = 35
-CODE_VAL_MIN = 120
+CODE_HUE_RANGE = (210, 255)
+CODE_SAT_MIN = 15
+CODE_VAL_MIN = 80
 
 
 def preprocess(crop):
@@ -134,7 +134,7 @@ def main():
             region["x"] + region["width"], region["y"] + region["height"],
         ))
 
-    FALLBACK_EVERY = 5  # cada cuantos ciclos se corre tambien el OCR generico
+    FALLBACK_EVERY = 2  # cada cuantos ciclos se corre tambien el OCR generico
     cycle = 0
 
     def read_and_match():
