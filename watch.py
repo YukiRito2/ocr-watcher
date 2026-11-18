@@ -4,7 +4,7 @@ aparece.
 
 Uso:
     .venv/bin/python watch.py                  # selecciona zona y vigila 120s
-    .venv/bin/python watch.py --reselect        # vuelve a pedir la zona
+    .venv/bin/python watch.py --use-last        # reusa la ultima zona guardada
     .venv/bin/python watch.py --seconds 60
     .venv/bin/python watch.py --pattern '[A-Z0-9]{4,6}'
 """
@@ -42,8 +42,10 @@ def preprocess(crop):
 MAX_THUMB_WIDTH = 2800
 
 
-def ensure_region(force_reselect, grabber):
-    if force_reselect or not os.path.exists(REGION_FILE):
+def ensure_region(use_last, grabber):
+    if use_last and os.path.exists(REGION_FILE):
+        pass
+    else:
         print("Tomando una foto de tu pantalla para usar de miniatura en el selector...")
         full = grabber.grab()
         real_w, real_h = full.size
@@ -69,13 +71,20 @@ def copy_to_clipboard(text):
     subprocess.run(["wl-copy"], input=text.encode(), check=True)
 
 
+def notify(title, body):
+    subprocess.run(["notify-send", title, body])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seconds", type=int, default=120, help="tiempo maximo de vigilancia")
     parser.add_argument("--interval", type=float, default=0.7, help="segundos entre capturas")
     parser.add_argument("--pattern", default=DEFAULT_PATTERN, help="regex del codigo a detectar")
     parser.add_argument("--lang", default="spa+eng", help="idiomas para tesseract")
-    parser.add_argument("--reselect", action="store_true", help="volver a elegir la zona")
+    parser.add_argument(
+        "--use-last", action="store_true",
+        help="reusar la ultima zona guardada en vez de volver a preguntar",
+    )
     args = parser.parse_args()
 
     pattern = re.compile(args.pattern)
@@ -86,7 +95,7 @@ def main():
     print("Permiso concedido.")
     grabber = FrameGrabber(node_id, pw_fd)
 
-    region = ensure_region(args.reselect, grabber)
+    region = ensure_region(args.use_last, grabber)
     print(f"Zona: {region}")
     print("Vigilando...")
 
@@ -117,14 +126,21 @@ def main():
                 codigo = match.group(1).replace("-", "")
                 copy_to_clipboard(codigo)
                 print(f"\n>>> CODIGO DETECTADO: {codigo}  (copiado al portapapeles)")
+                notify("Codigo detectado", f"{codigo} copiado al portapapeles")
                 return
 
             time.sleep(args.interval)
 
         print("Tiempo agotado, no se detecto ningun codigo.")
+        notify("OCR Watcher", "Tiempo agotado, no se detecto ningun codigo.")
     finally:
         grabber.close()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        notify("OCR Watcher - error", str(e))
+        raise

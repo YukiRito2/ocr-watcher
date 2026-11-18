@@ -4,5 +4,5 @@ Name=OCR Code Watcher
 Comment=Vigila la pantalla y copia el codigo detectado al portapapeles
 Exec=/home/valentin/Descargas/ocr-watcher/run.sh
 Icon=utilities-terminal
-Terminal=true
+Terminal=false
 Categories=Utility;
